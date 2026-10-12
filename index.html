@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vis-Eco · Inventario</title>
+  <link rel="icon" type="image/png" href="img/logo-viseco-sm.png">
+  <link rel="stylesheet" href="css/styles.css?v=6">
+</head>
+<body>
+
+  <header class="topbar">
+    <nav class="pill" aria-label="Navegación principal">
+      <span class="pill__brand">
+        <img src="img/logo-viseco-sm.png" alt="" width="36" height="36">
+        <span id="brand-name">Vis-Eco</span>
+      </span>
+      <div class="pill__tabs" role="tablist">
+        <button class="tab is-active" role="tab" data-view="scan" aria-selected="true">Escanear</button>
+        <button class="tab" role="tab" data-view="inventory" aria-selected="false">Inventario</button>
+        <button class="tab" role="tab" data-view="cuadre" aria-selected="false">Cuadre</button>
+      </div>
+      <span class="sync" id="sync-chip" title="Estado de sincronización">
+        <i class="dot" id="sync-dot"></i><span id="sync-text">Conectando…</span>
+      </span>
+    </nav>
+  </header>
+
+  <main class="page">
+
+    <!-- ===================== ESCANEAR ===================== -->
+    <section id="view-scan" class="view">
+      <div class="grid">
+
+        <div class="stack">
+          <h2 class="heading">Escanear código</h2>
+
+          <div class="card">
+            <div class="seg" role="tablist" aria-label="Método de escaneo">
+              <button class="seg__btn is-active" data-method="camera" role="tab" aria-selected="true">Cámara en vivo</button>
+              <button class="seg__btn" data-method="photo" role="tab" aria-selected="false">Subir fotos</button>
+            </div>
+
+            <div id="method-camera" class="method">
+              <div class="viewfinder" id="viewfinder">
+                <video id="video" playsinline muted></video>
+                <div class="viewfinder__frame" aria-hidden="true"></div>
+                <p class="viewfinder__idle" id="camera-idle">La cámara está apagada.</p>
+              </div>
+              <p id="camera-notice" class="notice" hidden></p>
+              <div class="row">
+                <select id="camera-select" class="select" aria-label="Cámara" hidden></select>
+                <button id="camera-toggle" class="btn btn--primary" type="button">Iniciar cámara</button>
+              </div>
+            </div>
+
+            <div id="method-photo" class="method" hidden>
+              <label class="drop" id="dropzone" tabindex="0">
+                <input id="file-input" type="file" accept="image/*" multiple hidden>
+                <strong>Arrastre las fotos aquí</strong>
+                <span class="muted">o haga clic para elegirlas. Acepta varias imágenes a la vez.</span>
+              </label>
+              <ul id="photo-log" class="photo-log"></ul>
+            </div>
+
+            <form id="manual-form" class="manual" autocomplete="off">
+              <label class="field field--inline">
+                <span>Código manual</span>
+                <input id="manual-input" type="text" inputmode="numeric" placeholder="Escriba o use un lector USB">
+              </label>
+              <button class="btn btn--secondary" type="submit">Buscar</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="stack">
+          <h2 class="heading">Resultado</h2>
+          <label class="check check--box">
+            <input type="checkbox" id="deduct-toggle" checked>
+            <span>Descontar 1 unidad del stock en cada escaneo</span>
+          </label>
+          <div id="result" class="card result" aria-live="polite">
+            <p class="muted empty">Escanee un código para ver aquí la prenda, su precio y el stock disponible.</p>
+          </div>
+
+          <div class="card card--flush">
+            <div class="card__head">
+              <h3 class="subheading">Escaneos recientes</h3>
+              <button class="btn btn--ghost btn--sm" id="clear-history" type="button">Limpiar</button>
+            </div>
+            <ul id="history" class="history"></ul>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===================== INVENTARIO ===================== -->
+    <section id="view-inventory" class="view" hidden>
+      <div class="inv-head">
+        <div>
+          <h2 class="heading">Inventario</h2>
+          <p class="muted" id="inv-meta">Sin datos todavía.</p>
+        </div>
+        <div class="row row--wrap">
+          <button class="btn btn--secondary" id="btn-connect" type="button">Vincular archivo Excel</button>
+          <label class="btn btn--secondary" for="manual-file">Cargar archivo
+            <input id="manual-file" type="file" accept=".xlsx,.xlsm,.xls,.csv" hidden>
+          </label>
+          <button class="btn btn--ghost" id="btn-refresh" type="button">Actualizar ahora</button>
+        </div>
+      </div>
+
+      <p id="inv-notice" class="notice" hidden></p>
+
+      <div class="card card--flush">
+        <div class="toolbar">
+          <label class="field field--inline field--grow">
+            <span class="sr-only">Buscar</span>
+            <input id="inv-search" type="search" placeholder="Buscar por nombre, código, talla o color">
+          </label>
+          <label class="check"><input type="checkbox" id="inv-low"> Solo stock bajo o agotado</label>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Código</th><th>Prenda</th><th>Talla</th><th>Color</th><th class="num">Precio</th><th class="num">Stock</th></tr>
+            </thead>
+            <tbody id="inv-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== CUADRE ===================== -->
+    <section id="view-cuadre" class="view" hidden>
+
+      <!-- bloqueado -->
+      <div id="cuadre-locked" class="lock">
+        <div class="lock__art" aria-hidden="true"><img src="img/logo-viseco.png" alt=""></div>
+        <div class="lock__box">
+          <h2 class="heading">Zona de cuadre</h2>
+          <p class="muted">Aquí se corrigen precios y stock y se compara el conteo físico. Ingrese las credenciales para continuar.</p>
+          <div class="login__form">
+            <label class="field"><span>Usuario</span>
+              <input id="login-user" type="text" autocomplete="username" autocapitalize="none" spellcheck="false">
+            </label>
+            <label class="field"><span>Contraseña</span>
+              <input id="login-pass" type="password" autocomplete="current-password">
+            </label>
+            <p id="login-error" class="notice notice--error" role="alert" hidden></p>
+            <button id="login-btn" class="btn btn--filled" type="button">Desbloquear</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- desbloqueado -->
+      <div id="cuadre-open" hidden>
+        <div class="inv-head">
+          <div>
+            <h2 class="heading">Cuadre</h2>
+            <p class="muted">Los cambios se guardan en este navegador. Descargue el Excel actualizado para dejarlos en el archivo.</p>
+          </div>
+          <button class="btn btn--ghost" id="lock-btn" type="button">Bloquear</button>
+        </div>
+
+        <!-- Conteo físico -->
+        <div class="card card--flush section">
+          <div class="card__head">
+            <h3 class="subheading">Conteo físico</h3>
+            <span class="muted small" id="count-state">Pausado</span>
+          </div>
+          <div class="pad">
+            <p class="muted">Con el conteo activo, cada código que lea en «Escanear» (cámara, fotos o lector USB) suma una unidad. También puede escribirlos aquí.</p>
+            <div class="row row--wrap">
+              <button class="btn btn--primary" id="count-toggle" type="button">Iniciar conteo</button>
+              <form id="count-form" class="inline-form" autocomplete="off">
+                <input id="count-input" type="text" inputmode="numeric" placeholder="Código + Enter" aria-label="Código a contar">
+              </form>
+              <button class="btn btn--ghost" id="count-reset" type="button">Reiniciar conteo</button>
+              <button class="btn btn--secondary" id="count-apply-all" type="button">Ajustar stock a lo contado</button>
+            </div>
+          </div>
+          <div class="table-wrap table-wrap--short">
+            <table class="table">
+              <thead><tr><th>Código</th><th>Prenda</th><th class="num">Sistema</th><th class="num">Contado</th><th class="num">Diferencia</th><th></th></tr></thead>
+              <tbody id="count-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Edición -->
+        <div class="card card--flush section">
+          <div class="card__head">
+            <h3 class="subheading">Datos de las prendas</h3>
+            <span class="muted small" id="pending-text">Sin cambios</span>
+          </div>
+          <div class="pad pad--tight">
+            <div class="row row--wrap">
+              <button class="btn btn--filled" id="btn-export" type="button">Descargar Excel actualizado</button>
+              <button class="btn btn--ghost" id="btn-discard" type="button">Descartar cambios</button>
+            </div>
+            <details class="add">
+              <summary>Agregar una prenda nueva</summary>
+              <form id="add-form" class="add__grid" autocomplete="off">
+                <label class="field"><span>Código</span><input name="barcode" required></label>
+                <label class="field"><span>Nombre</span><input name="name"></label>
+                <label class="field"><span>Talla</span><input name="size"></label>
+                <label class="field"><span>Color</span><input name="color"></label>
+                <label class="field"><span>Precio</span><input name="price" inputmode="numeric"></label>
+                <label class="field"><span>Stock</span><input name="stock" inputmode="numeric"></label>
+                <button class="btn btn--secondary" type="submit">Agregar</button>
+              </form>
+              <p id="add-notice" class="notice" hidden></p>
+            </details>
+          </div>
+          <div class="toolbar">
+            <label class="field field--inline field--grow">
+              <span class="sr-only">Buscar</span>
+              <input id="edit-search" type="search" placeholder="Buscar por código, nombre, talla o color">
+            </label>
+            <label class="check"><input type="checkbox" id="edit-empty"> Solo los que faltan por llenar</label>
+          </div>
+          <div class="table-wrap">
+            <table class="table table--edit">
+              <thead><tr><th>Código</th><th>Nombre</th><th>Talla</th><th>Color</th><th class="num">Precio</th><th class="num">Stock</th></tr></thead>
+              <tbody id="edit-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="js/vendor/xlsx.full.min.js"></script>
+  <script src="js/vendor/zxing.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/inventory.js"></script>
+  <script src="js/scanner.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
